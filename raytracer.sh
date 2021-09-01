@@ -9,8 +9,7 @@ IMAGE_WIDTH=64
 IMAGE_HEIGHT=64
 NUM_PROCS=4
 OUTPUT=$1
-if [ -z "$OUTPUT" ]
-then
+if [[ ! $OUTPUT ]]; then
     fatal "Usage: ./raytracer.sh output.ppm"
 fi
 
@@ -78,8 +77,7 @@ sphere_intersect() {
     mul "$a" "$c"; local ac=$ret
     sub "$half_b_2" "$ac"; local discrim=$ret
 
-    if [ "$discrim" -gt 0 ]
-    then
+    if ((discrim > 0)); then
         sqrt "$discrim"; local root=$ret
         sub 0 "$half_b"; local minus_half_b=$ret
 
@@ -101,8 +99,7 @@ sphere_intersect() {
         add "$minus_half_b" "$root"
         div "$ret" "$a"
         t=$ret
-        if [ $t -gt 0 ]
-        then
+        if ((t > 0)); then
             # TODO is this branch the same as above? could refactor later
             # p = o + t * d
             vec3_mulf tv ray_dir[@] $t
@@ -129,8 +126,7 @@ plane_intersect() {
     local ray_dir=("${!5}")
 
     local ray_o_y=${ray_dir[1]}
-    if [ $ray_o_y -eq 0 ]
-    then
+    if ((ray_o_y == 0)); then
         eval $hit_t_out=-1
     else
         # t = (c - o.y) / d.y
@@ -139,8 +135,7 @@ plane_intersect() {
         local ray_d_y=${ray_dir[1]}
         div "$ray_y_dist" "$ray_d_y"
         local t=$ret
-        if [ $t -gt 0 ] && [ $t -lt 2000000000 ]
-        then
+        if ((t > 0 && t < 2000000000)); then
             vec3_mulf ray_scaled_d ray_dir[@] $t
             vec3_add point ray_origin[@] ray_scaled_d[@]
 
@@ -174,8 +169,7 @@ light_contrib() {
     local ret
     vec3_dot norm[@] lnorm[@]; local ndotl=$ret
 
-    if [ "$ndotl" -lt 0 ]
-    then
+    if ((ndotl < 0)); then
         vec3 $1 0 0 0
     else
         vec3_mulf unscaled_out light_col[@] $ndotl
@@ -192,11 +186,10 @@ trace() {
     local col=(0 0 0)
 
 
-    if [ $depth -gt 3 ]
-    then
+    if ((depth > 3)); then
         return
     else
-        depth=$(( depth + 1 ))
+        ((depth++))
     fi
 
     # vec3_print ray_origin[@]
@@ -209,16 +202,14 @@ trace() {
     plane_intersect hit_t_2 hit_point_2 hit_normal_2 ray_origin[@] ray_dir[@]
 
     # print $hit_t_1
-    # if [ $hit_t_1 -lt 0 ]
-    # then
+    # if ((hit_t_1 < 0)); then
     #     echo -n ""
     # else
     #     vec3_print hit_point_1[@]
     #     vec3_print hit_normal_1[@]
     # fi
     # print $hit_t_2
-    # if [ $hit_t_2 -lt 0 ]
-    # then
+    # if ((hit_t_2 < 0)); then
     #     echo -n ""
     # else
     #     vec3_print hit_point_2[@]
@@ -226,8 +217,7 @@ trace() {
     # fi
     # echo "==========="
 
-    if [ $hit_t_1 -gt $ray_epsilon ]
-    then
+    if ((hit_t_1 > ray_epsilon)); then
         # specular reflection
         offset_origin new_origin hit_point_1[@] hit_normal_1[@]
 
@@ -257,69 +247,60 @@ trace() {
 
         vec3 base_col ${sphere_color[@]}
         vec3_mul col base_col[@] col[@]
-    else
-        if [ $hit_t_2 -gt $ray_epsilon ]
-        then
-            local light_col=(0 0 0)
-            local hit_p_x=${hit_point_2[0]}
-            local hit_p_z=${hit_point_2[2]}
+    elif ((hit_t_2 > ray_epsilon)); then
+        local light_col=(0 0 0)
+        local hit_p_x=${hit_point_2[0]}
+        local hit_p_z=${hit_point_2[2]}
 
-            # Use equation of a circle to fake shadow
-            local ret
-            sub "$hit_p_z" "$shadow_center"; local shadow_offset_z=$ret
-            mul "$hit_p_x" "$hit_p_x"; local shadow_offset_x_2=$ret
-            mul "$shadow_offset_z" "$shadow_offset_z"; local shadow_offset_z_2=$ret
-            add "$shadow_offset_x_2" "$shadow_offset_z_2"; local hit_dist_2=$ret
+        # Use equation of a circle to fake shadow
+        local ret
+        sub "$hit_p_z" "$shadow_center"; local shadow_offset_z=$ret
+        mul "$hit_p_x" "$hit_p_x"; local shadow_offset_x_2=$ret
+        mul "$shadow_offset_z" "$shadow_offset_z"; local shadow_offset_z_2=$ret
+        add "$shadow_offset_x_2" "$shadow_offset_z_2"; local hit_dist_2=$ret
 
-            if [ $hit_dist_2 -gt $shadow_radius ]
-            then
-                light_contrib out_col1 \
-                    hit_point_2[@] \
-                    hit_normal_2[@] \
-                    light1_pos[@] \
-                    light1_col[@]
+        if ((hit_dist_2 > shadow_radius)); then
+            light_contrib out_col1 \
+                hit_point_2[@] \
+                hit_normal_2[@] \
+                light1_pos[@] \
+                light1_col[@]
 
-                light_contrib out_col2 \
-                    hit_point_2[@] \
-                    hit_normal_2[@] \
-                    light2_pos[@] \
-                    light2_col[@]
+            light_contrib out_col2 \
+                hit_point_2[@] \
+                hit_normal_2[@] \
+                light2_pos[@] \
+                light2_col[@]
 
-                vec3_add light_col light_col[@] out_col1[@]
-                vec3_add light_col light_col[@] out_col2[@]
-            fi
-
-            # Calculate checkerboard pattern
-            # TODO: Is there a better way?
-            local half=$(( scale / 2 ))
-            local hit_p_x=$(( hit_p_x % scale ))
-            local hit_p_z=$(( hit_p_z % scale ))
-
-            # shitty hack
-            if [ $hit_p_x -lt 0 ]
-            then
-              add "$hit_p_x" "$scale"; hit_p_x=$ret
-            fi
-
-            local ret
-            abs "$hit_p_x"; hit_p_x=$ret
-            abs "$hit_p_z"; hit_p_z=$ret
-
-            local base_col=(0 0 0)
-            if [ $hit_p_x -gt $half ] && [ $hit_p_z -gt $half ]
-            then
-                vec3 base_col ${plane_color_1[@]}
-            else
-                if [ $hit_p_x -lt $half ] && [ $hit_p_z -lt $half ]
-                then
-                    vec3 base_col ${plane_color_1[@]}
-                else
-                    vec3 base_col ${plane_color_2[@]}
-                fi
-            fi
-
-            vec3_mul col light_col[@] base_col[@]
+            vec3_add light_col light_col[@] out_col1[@]
+            vec3_add light_col light_col[@] out_col2[@]
         fi
+
+        # Calculate checkerboard pattern
+        # TODO: Is there a better way?
+        local half=$(( scale / 2 ))
+        local hit_p_x=$(( hit_p_x % scale ))
+        local hit_p_z=$(( hit_p_z % scale ))
+
+        # shitty hack
+        if ((hit_p_x < 0)); then
+          add "$hit_p_x" "$scale"; hit_p_x=$ret
+        fi
+
+        local ret
+        abs "$hit_p_x"; hit_p_x=$ret
+        abs "$hit_p_z"; hit_p_z=$ret
+
+        local base_col=(0 0 0)
+        if ((hit_p_x > half && hit_p_z > half)); then
+            vec3 base_col ${plane_color_1[@]}
+        elif ((hit_p_x < half && hit_p_z < half)); then
+            vec3 base_col ${plane_color_1[@]}
+        else
+            vec3 base_col ${plane_color_2[@]}
+        fi
+
+        vec3_mul col light_col[@] base_col[@]
     fi
 
     vec3 $1 ${col[@]}
@@ -327,8 +308,7 @@ trace() {
 
 worker() {
     WORKER_INDEX=$1
-    if [ "$WORKER_INDEX" -gt $NUM_PROCS ]
-    then
+    if ((WORKER_INDEX > NUM_PROCS)); then
         fatal "Worker index ${WORKER_INDEX} out of bounds"
     fi
 
