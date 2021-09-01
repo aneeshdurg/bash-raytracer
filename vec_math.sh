@@ -69,7 +69,7 @@ vec3_dot() {
     mul ${a[0]} ${b[0]}; local x=$ret
     mul ${a[1]} ${b[1]}; local y=$ret
     mul ${a[2]} ${b[2]}; local z=$ret
-    ((ret = x + y + z, 1))
+    ((ret = x + y + z))
 }
 
 vec3_truncate() {

@@ -2,22 +2,22 @@
 scale="100000000"
 frac_digits=${#scale}
 
-add() ((ret = $1 + $2, 1))
-sub() ((ret = $1 - $2, 1))
+add() ((ret = $1 + $2))
+sub() ((ret = $1 - $2))
 
 mul() {
-    ((ret = $1 * $2 / scale, 1))
+    ((ret = $1 * $2 / scale))
     if ((ret < 0 && $1 > 0 && $2 > 0)); then
       log "OVERFLOW DETECTED: $1 x $2 = $ret"
     fi
 }
-div() ((ret = $1 * scale / $2, 1))
+div() ((ret = $1 * scale / $2))
 
-div_by_2() ((ret = $1 >> 1, 1))
-mul_by_2() ((ret = $1 << 1, 1))
+div_by_2() ((ret = $1 >> 1))
+mul_by_2() ((ret = $1 << 1))
 
-truncate() ((ret = $1 / scale, 1))
-abs() ((ret = $1 < 0 ? -$1 : $1, 1))
+truncate() ((ret = $1 / scale))
+abs() ((ret = $1 < 0 ? -$1 : $1))
 sqrt() {
     local x=$1
     if ((x < 0)); then
@@ -139,7 +139,7 @@ inv_sqrt() {
 }
 
 clamp_0_1() {
-  ((ret = $1 > scale ? scale : $1 < 0 ? 0 : $1, 1))
+  ((ret = $1 > scale ? scale : $1 < 0 ? 0 : $1))
 }
 
 source ./vec_math.sh
