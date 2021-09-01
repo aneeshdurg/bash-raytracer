@@ -1,5 +1,6 @@
 #!/bin/bash
 set -e
+set -f
 
 source ./utils.sh
 source ./math.sh
