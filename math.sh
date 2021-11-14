@@ -1,91 +1,46 @@
 
-let scale="100000000"
-let frac_digits=${#scale}
+scale="100000000"
+frac_digits=${#scale}
 
-add() {
-    local a=$1
-    local b=$2
-    echo $((a + b))
-}
-
-sub() {
-    local a=$1
-    local b=$2
-    echo $((a - b))
-}
+add() ((ret = $1 + $2))
+sub() ((ret = $1 - $2))
 
 mul() {
-    local a=$1
-    local b=$2
-    local res=$((a * b / scale))
-
-    if [ $res -lt 0 ] && [ $a -gt 0 ] && [ $b -gt 0 ]
-    then
-        log "OVERFLOW DETECTED: ${a} x ${b} = ${res}"
-    fi
-
-    echo $res
-}
-
-div() {
-    local a=$1
-    local b=$2
-    echo $((a * scale / b))
-}
-
-div_by_2() {
-    local a=$1
-    echo $((a >> 1))
-}
-
-
-mul_by_2() {
-    local a=$1
-    echo $((a << 1))
-}
-
-truncate() {
-    local a=$1
-    echo $((a / scale))
-}
-
-abs() {
-    local x=$1
-    if [ $x -lt 0 ]
-    then
-        echo $(( -x ))
-    else
-        echo $x
+    ((ret = $1 * $2 / scale))
+    if ((ret < 0 && $1 > 0 && $2 > 0)); then
+      log "OVERFLOW DETECTED: $1 x $2 = $ret"
     fi
 }
+div() ((ret = $1 * scale / $2))
 
+div_by_2() ((ret = $1 >> 1))
+mul_by_2() ((ret = $1 << 1))
 
+truncate() ((ret = $1 / scale))
+abs() ((ret = $1 < 0 ? -$1 : $1))
 sqrt() {
     local x=$1
-    if [ "$x" -lt 0 ]
-    then
+    if ((x < 0)); then
         fatal "arg passed to sqrt x was negative: ${x}"
         # TODO mul can exceed the precision needed so certain dot products get
         # weird
-        # x=$(abs $x)
+        # abs "$x"; x=$ret
         # echo 0
         # return
     fi
 
-    local guess=$(div_by_2 $x)
-    for i in {0..5}
-    do
-        if [ $guess -eq 0 ]
-        then
-            guess=0
-            break
+    div_by_2 "$x"
+    local guess=$ret
+    for i in {0..5}; do
+        if ((guess==0)); then
+          break
         fi
-
-        local tmp=$(div $x $guess)
-        tmp=$(add $tmp $guess)
-        guess=$(div_by_2 $tmp)
+        div "$x" "$guess"
+        add "$ret" "$guess"
+        div_by_2 "$ret"
+        guess=$ret
     done
-    echo $guess
+    ret=$guess
 }
 
 # Convert a number to fixed point representation
@@ -122,7 +77,7 @@ to_fp() {
         res=$(( int_part * scale + frac_padded ))
     fi
 
-    echo $res
+    ret=$res
 }
 
 # Converts from fixed point to normal representation
@@ -145,55 +100,46 @@ from_fp() {
     local x_length=${#x}
     local decimal_point_pos=$((x_length - frac_digits + 1))
     local fract_part=${x:$decimal_point_pos:$frac_digits}
-    echo "${int_part}.${fract_part}"
+    ret=${int_part}.${fract_part}
 }
 
 vec3_print() {
-    local v=("${!1}")
-    echo "{ $(from_fp ${v[0]}), $(from_fp ${v[1]}), $(from_fp ${v[2]}) }"
+    local -a v=("${!1}")
+    from_fp "${v[0]}"; v[0]=$ret
+    from_fp "${v[1]}"; v[1]=$ret
+    from_fp "${v[2]}"; v[2]=$ret
+    echo "{ ${v[0]}, ${v[1]}, ${v[2]} }"
 }
 
 print() {
-    from_fp $1
+    local ret
+    from_fp "$1"
+    echo "$1"
 }
 
-three_halves=$(to_fp 1.5)
+to_fp 1.5; three_halves=$ret
 
 inv_sqrt() {
-    local x=$1
-    div $scale $(sqrt $x)
-    # if [ "$x" -lt 0 ]
-    # then
+    sqrt "$1"
+    div "$scale" "$ret"
+
+    # if ((x<0)); then
     #     fatal "arg passed to inv sqrt x was negative ${x}"
     # fi
-
-    # local x2=$(div_by_2 $x)
-    # local guess=$(div $scale $x)
-
-    # for i in {0..4}
-    # do
-    #     local tmp=$(mul $guess $guess)
-    #     tmp=$(mul $tmp $x2)
-    #     tmp=$(sub $three_halves $tmp)
-    #     guess=$(mul $tmp $guess)
+    # div_by_2 "$x"; local x2=$ret
+    # div $scale $x; local guess=$ret
+    # for i in {0..4}; do
+    #     mul $guess $guess
+    #     mul $ret $x2
+    #     sub $three_halves $ret
+    #     mul $ret $guess
+    #     guess=$ret
     # done
-
-    # echo $guess
+    # ret=$guess
 }
 
 clamp_0_1() {
-    local x=$1
-    if [ $x -gt $scale ]
-    then
-        echo $scale
-    else
-        if [ $x -lt 0 ]
-        then
-            echo 0
-        else
-            echo $x
-        fi
-    fi
+  ((ret = $1 > scale ? scale : $1 < 0 ? 0 : $1))
 }
 
 source ./vec_math.sh
